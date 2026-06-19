@@ -23,7 +23,7 @@ function App() {
         
         {/* Footer */}
         <footer className="py-12 border-t border-white/5 text-center text-white/30 text-sm">
-          <p>© 2026 MLLAB • Designed for Engineering Excellence</p>
+          <p>© 2026 ELAB • Designed by Akash Patil</p>
         </footer>
       </div>
     </Router>
