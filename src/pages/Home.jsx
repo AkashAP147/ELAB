@@ -38,12 +38,12 @@ const labs = labDefs.map(lab => ({
 
 const Home = () => {
   return (
-    <div className="max-w-7xl mx-auto px-6 py-20">
-      <div className="text-center mb-24">
+    <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20">
+      <div className="text-center mb-16 md:mb-24">
         <motion.h1 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-5xl md:text-7xl font-bold mb-6 tracking-tight"
+          className="text-4xl md:text-5xl lg:text-7xl font-bold mb-4 md:mb-6 tracking-tight leading-tight"
         >
           Engineering <span className="text-gradient">Virtual Coding</span> Labs
         </motion.h1>
@@ -51,7 +51,7 @@ const Home = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="text-xl text-white/50 max-w-2xl mx-auto mb-10"
+          className="text-lg md:text-xl text-white/50 max-w-2xl mx-auto mb-8 md:mb-10 px-4 md:px-0"
         >
           A premium interactive platform for mastering complex coding concepts through visual feedback and real-time interactive breakdowns.
         </motion.p>
@@ -59,8 +59,9 @@ const Home = () => {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
+          className="px-4 md:px-0"
         >
-          <button className="bg-brand-primary hover:bg-brand-primary/80 text-white px-8 py-4 rounded-full font-semibold transition-all shadow-xl shadow-brand-primary/20 flex items-center gap-2 mx-auto">
+          <button className="bg-brand-primary w-full sm:w-auto hover:bg-brand-primary/80 text-white px-6 md:px-8 py-3 md:py-4 rounded-full font-semibold transition-all shadow-xl shadow-brand-primary/20 flex items-center justify-center gap-2 mx-auto">
             Explore All Experiments <ArrowRight className="w-5 h-5" />
           </button>
         </motion.div>
