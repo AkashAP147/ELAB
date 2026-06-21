@@ -46,6 +46,13 @@ const ExperimentDetail = () => {
   const [skipComments, setSkipComments] = useState(false);
   const [inlineBreakdown, setInlineBreakdown] = useState(true);
   const hiddenTextareaRef = React.useRef(null);
+  const cursorRef = React.useRef(null);
+
+  useEffect(() => {
+    if (cursorRef.current && activeTab === 'practice') {
+      cursorRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [cursorPos, activeTab]);
 
   const targetCode = React.useMemo(() => {
     if (!skipComments) return experiment.code;
@@ -378,7 +385,7 @@ const ExperimentDetail = () => {
                     <div className="flex-1 overflow-auto p-4 md:p-6 bg-black/40 font-mono text-xs md:text-sm leading-relaxed cursor-text relative">
                       <textarea
                         ref={hiddenTextareaRef}
-                        className="absolute w-1 h-1 opacity-0 p-0 m-0 border-0 focus:ring-0 focus:outline-none"
+                        className="fixed top-1/2 left-1/2 w-1 h-1 opacity-0 p-0 m-0 border-0 focus:ring-0 focus:outline-none -z-10"
                         value={practiceCode}
                         onChange={(e) => {
                           setPracticeCode(e.target.value);
@@ -437,6 +444,7 @@ const ExperimentDetail = () => {
                                   return (
                                     <span 
                                       key={charIndex} 
+                                      ref={isCursor ? cursorRef : null}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         if (hiddenTextareaRef.current) {
@@ -457,7 +465,7 @@ const ExperimentDetail = () => {
                                       }}
                                       className={cn(
                                         colorClass, 
-                                        isCursor && "relative after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:w-[2px] after:bg-brand-primary after:animate-pulse",
+                                        isCursor && "relative after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:w-[2px] after:bg-brand-primary after:animate-pulse scroll-mb-32",
                                         isErrorSpace && "inline-block w-[0.5em]", // ensure error spaces are visible
                                         "cursor-text"
                                       )}
@@ -472,7 +480,8 @@ const ExperimentDetail = () => {
                                   const isLastLine = lineIndex === targetCode.split('\n').length - 1;
                                   if (isNewlineCursor && !isLastLine) {
                                     return <span 
-                                      className="relative after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:w-[2px] after:bg-brand-primary after:animate-pulse ml-[1px] text-white/30 cursor-text"
+                                      ref={cursorRef}
+                                      className="relative after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:w-[2px] after:bg-brand-primary after:animate-pulse ml-[1px] text-white/30 cursor-text scroll-mb-32"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         if (hiddenTextareaRef.current) {
@@ -485,7 +494,7 @@ const ExperimentDetail = () => {
                                     >↵</span>;
                                   }
                                   if (isNewlineCursor && isLastLine) {
-                                    return <span className="relative after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:w-[2px] after:bg-brand-primary after:animate-pulse ml-[1px]"></span>;
+                                    return <span ref={cursorRef} className="relative after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:w-[2px] after:bg-brand-primary after:animate-pulse ml-[1px] scroll-mb-32"></span>;
                                   }
                                   return null;
                                 })()}
