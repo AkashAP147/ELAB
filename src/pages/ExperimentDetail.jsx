@@ -277,8 +277,9 @@ const ExperimentDetail = () => {
                     className="relative w-full h-full flex flex-col"
                     onMouseLeave={() => setHoveredLine(null)}
                   >
-                    <div className="flex-1 overflow-auto p-4 md:p-6 pb-40 min-w-max">
-                      {experiment.code.split('\n').map((line, idx) => {
+                    <div className="flex-1 overflow-auto p-4 md:p-6 pb-40">
+                      <div className="min-w-max">
+                        {experiment.code.split('\n').map((line, idx) => {
                         const lineNum = idx + 1;
                         const isHighlighted = hoveredLine === lineNum;
                         const expl = finalExplanation.find(item => item.line === lineNum);
@@ -321,6 +322,7 @@ const ExperimentDetail = () => {
                           </div>
                         );
                       })}
+                      </div>
                     </div>
                   </motion.div>
                 ) : activeTab === 'practice' ? (
