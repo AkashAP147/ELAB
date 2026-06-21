@@ -120,6 +120,7 @@ plt.show()`,
     title: "FIND-S Algorithm Implementation",
     description: "For a given set of training data examples stored in a CSV file, implement and demonstrate the Find-S algorithm to output the most specific hypothesis consistent with the training examples.",
     lab: 'Machine Learning',
+    downloadLink: '/training_data.csv',
     code: `import csv
 file = open('training_data.csv')
 data = list(csv.reader(file))

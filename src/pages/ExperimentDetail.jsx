@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Info, Play, Copy, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, Play, Copy, Check, Download } from 'lucide-react';
 import { experiments } from '../data/experiments';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -96,6 +96,18 @@ const ExperimentDetail = () => {
           <p className="text-white/50 leading-relaxed text-xs md:text-base line-clamp-2 md:line-clamp-none hover:line-clamp-none transition-all duration-300 cursor-pointer">
             {experiment.description}
           </p>
+          {experiment.downloadLink && (
+            <div className="mt-4 md:mt-6">
+              <a 
+                href={experiment.downloadLink} 
+                download 
+                className="inline-flex items-center gap-2 px-4 py-2 bg-brand-primary/20 hover:bg-brand-primary/40 text-brand-secondary border border-brand-primary/30 rounded-xl transition-all text-xs md:text-sm font-medium"
+              >
+                <Download className="w-4 h-4" />
+                Download Dataset
+              </a>
+            </div>
+          )}
         </motion.div>
 
         {/* Right Column: Code & Viewers (Order 2 on mobile, Col 2-3 Row 1-2 on desktop) */}
