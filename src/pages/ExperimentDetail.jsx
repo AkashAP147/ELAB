@@ -36,6 +36,18 @@ const ExperimentDetail = () => {
   const [activeTab, setActiveTab] = useState('code');
   const [hoveredLine, setHoveredLine] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [practiceCode, setPracticeCode] = useState('');
+  const [skipComments, setSkipComments] = useState(false);
+  const [inlineBreakdown, setInlineBreakdown] = useState(true);
+  const hiddenTextareaRef = React.useRef(null);
+
+  const targetCode = React.useMemo(() => {
+    if (!skipComments) return experiment.code;
+    return experiment.code
+      .split('\n')
+      .filter(line => !line.trim().startsWith('#'))
+      .join('\n');
+  }, [experiment.code, skipComments]);
 
   const autoGenerateExplanation = (code) => {
     const lines = code.split('\n');
@@ -45,27 +57,110 @@ const ExperimentDetail = () => {
       const lineNum = index + 1;
       const trimLine = line.trim();
       
-      if (trimLine.startsWith('import') || trimLine.startsWith('from')) {
-        autoExpl.push({ line: lineNum, text: `Importing library: ${trimLine.split(' ').slice(0, 2).join(' ')}`, type: 'import' });
-      } else if (trimLine.includes('plt.') || trimLine.includes('sns.')) {
-        autoExpl.push({ line: lineNum, text: 'Visualizing data using plotting functions.', type: 'plot' });
-      } else if (trimLine.includes('pd.read_') || trimLine.includes('load_') || trimLine.includes('fetch_')) {
-        autoExpl.push({ line: lineNum, text: 'Loading and preparing the dataset.', type: 'data' });
-      } else if (trimLine.includes('.fit(') || trimLine.includes('.train(')) {
-        autoExpl.push({ line: lineNum, text: 'Training the machine learning model on the provided data.', type: 'model' });
-      } else if (trimLine.includes('.predict(')) {
-        autoExpl.push({ line: lineNum, text: 'Making predictions using the trained model.', type: 'model' });
-      } else if (trimLine.startsWith('#')) {
-        autoExpl.push({ line: lineNum, text: `Comment: ${trimLine.replace('#', '').trim()}`, type: 'info' });
+      if (!trimLine) {
+        autoExpl.push({ line: lineNum, text: 'Empty line for readability and spacing.', type: 'formatting' });
+        return;
       }
+      
+      if (trimLine.startsWith('#')) {
+        autoExpl.push({ line: lineNum, text: `Comment: ${trimLine.replace('#', '').trim()}`, type: 'info' });
+        return;
+      }
+
+      let text = 'Executing an operation.';
+      let type = 'execution';
+
+      // Imports
+      if (trimLine.startsWith('import ')) {
+        const parts = trimLine.split(' ');
+        if (parts.includes('as')) {
+           text = `Imports the '${parts[1]}' library and aliases it as '${parts[3]}' for easier use.`;
+        } else {
+           text = `Imports the '${parts[1]}' library to use its functions.`;
+        }
+        type = 'import';
+      } else if (trimLine.startsWith('from ')) {
+        const parts = trimLine.split(' ');
+        text = `Imports specific components (${parts.slice(3).join(' ')}) from the '${parts[1]}' library.`;
+        type = 'import';
+      } 
+      // Machine Learning operations
+      else if (trimLine.includes('train_test_split(')) {
+        const vars = trimLine.split('=')[0].trim();
+        text = `Splits the dataset into training and testing subsets, assigning them to: ${vars}.`;
+        type = 'data';
+      } else if (trimLine.includes('.fit(')) {
+        const args = trimLine.split('.fit(')[1].split(')')[0];
+        text = `Trains (fits) the machine learning model using the training data: ${args}.`;
+        type = 'model';
+      } else if (trimLine.includes('.predict(')) {
+        const args = trimLine.split('.predict(')[1].split(')')[0];
+        const vars = trimLine.includes('=') ? trimLine.split('=')[0].trim() : 'the result';
+        text = `Uses the trained model to make predictions on ${args}, storing the output in '${vars}'.`;
+        type = 'model';
+      } else if (trimLine.includes('accuracy_score(') || trimLine.includes('mean_squared_error(')) {
+        const args = trimLine.includes('(') ? trimLine.split('(')[1].split(')')[0] : '';
+        text = `Evaluates the model's performance by comparing predicted values against actual values (${args}).`;
+        type = 'evaluation';
+      }
+      // Data processing
+      else if (trimLine.includes('pd.read_csv(') || trimLine.includes('pd.read_excel(')) {
+        const file = trimLine.split('(')[1].split(')')[0];
+        const vars = trimLine.split('=')[0].trim();
+        text = `Reads the dataset from ${file} and loads it into a pandas DataFrame named '${vars}'.`;
+        type = 'data';
+      }
+      // Functions
+      else if (trimLine.startsWith('def ')) {
+        const funcName = trimLine.split(' ')[1].split('(')[0];
+        const args = trimLine.split('(')[1].split(')')[0];
+        text = `Defines a function named '${funcName}' that accepts arguments: ${args || 'none'}.`;
+        type = 'function';
+      } else if (trimLine.startsWith('return ')) {
+        const val = trimLine.substring(7).trim();
+        text = `Outputs the calculated result '${val}' back to wherever the function was called.`;
+        type = 'return';
+      }
+      // Output
+      else if (trimLine.startsWith('print(')) {
+        const val = trimLine.substring(6, trimLine.length - 1);
+        text = `Prints the value or message ${val} to the console so you can see the result.`;
+        type = 'output';
+      }
+      // Generic Assignment (fallback)
+      else if (trimLine.includes('=')) {
+        const parts = trimLine.split('=');
+        const varName = parts[0].trim();
+        const expression = parts.slice(1).join('=').trim();
+        
+        if (expression.includes('model') || expression.includes('Classifier') || expression.includes('Regressor')) {
+          text = `Initializes a machine learning model (${expression.split('(')[0]}) and stores it in '${varName}'.`;
+          type = 'model';
+        } else {
+          text = `Evaluates the expression '${expression}' and assigns the result to the variable '${varName}'.`;
+          type = 'assignment';
+        }
+      } 
+      // Specific function calls (Fallback)
+      else if (trimLine.includes('plt.') || trimLine.includes('sns.')) {
+        text = `Configures or generates a data visualization using the plotting library.`;
+        type = 'plot';
+      } else if (trimLine.endsWith(')')) {
+         const func = trimLine.split('(')[0].trim().split(' ').pop();
+         text = `Calls the function '${func}' to execute a specific task.`;
+      }
+
+      autoExpl.push({ line: lineNum, text, type });
     });
     
-    return autoExpl.length > 0 ? autoExpl : [{ line: 1, text: 'Start exploring this code by reading line by line.', type: 'info' }];
+    return autoExpl;
   };
 
-  const finalExplanation = experiment.explanation?.length > 0 
-    ? experiment.explanation 
-    : autoGenerateExplanation(experiment.code);
+  const generatedExplanation = autoGenerateExplanation(experiment.code);
+  const finalExplanation = generatedExplanation.map(gen => {
+    const customExpl = experiment.explanation?.find(e => e.line === gen.line);
+    return customExpl ? customExpl : gen;
+  });
 
   if (!experiment) return <div className="text-white p-20 text-center">Experiment not found</div>;
 
@@ -82,12 +177,12 @@ const ExperimentDetail = () => {
         Back to Labs
       </Link>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-start">
         {/* Info Card (Order 1 on mobile, Col 1 Row 1 on desktop) */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="glass p-6 md:p-8 rounded-3xl lg:col-span-1 order-1 flex flex-col justify-center"
+          className="glass p-6 md:p-8 rounded-3xl lg:col-span-1 order-1 flex flex-col justify-center sticky top-6"
         >
           <span className="text-brand-secondary font-mono mb-2 md:mb-4 block text-xs md:text-sm">Experiment #{experiment.number}</span>
           <h1 className="text-lg md:text-3xl font-bold mb-2 md:mb-4 transition-all duration-300 hover:text-2xl active:text-2xl md:hover:text-3xl cursor-pointer line-clamp-1 hover:line-clamp-none active:line-clamp-none">
@@ -116,7 +211,7 @@ const ExperimentDetail = () => {
             {/* Tabs Header */}
             <div className="flex flex-wrap items-center justify-between gap-4 px-4 md:px-6 py-3 md:py-4 border-b border-white/5 bg-white/5">
               <div className="flex gap-2 md:gap-4">
-                {['code', 'output'].map((tab) => (
+                {['code', 'practice', 'output'].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -130,18 +225,35 @@ const ExperimentDetail = () => {
                 ))}
               </div>
               {activeTab === 'code' && (
-                <button 
-                  onClick={handleCopy}
-                  className="p-2 rounded-lg hover:bg-white/5 transition-colors text-white/50 hover:text-white flex items-center gap-2 text-[10px] md:text-xs shrink-0"
-                >
-                  {copied ? <Check className="w-3 h-3 md:w-4 md:h-4 text-green-400" /> : <Copy className="w-3 h-3 md:w-4 md:h-4" />}
-                  {copied ? 'Copied' : 'Copy Code'}
-                </button>
+                <div className="flex items-center gap-4 shrink-0">
+                  <button 
+                    onClick={() => setInlineBreakdown(!inlineBreakdown)}
+                    className="hidden md:flex items-center gap-2 text-[10px] md:text-xs text-white/50 hover:text-white transition-colors select-none group"
+                  >
+                    <span>Breakdown</span>
+                    <div className={cn(
+                      "w-8 h-4 rounded-full relative transition-colors duration-300 border border-white/10",
+                      inlineBreakdown ? "bg-brand-primary border-brand-primary" : "bg-black/40 group-hover:bg-black/60"
+                    )}>
+                      <div className={cn(
+                        "w-3 h-3 rounded-full bg-white absolute top-[1px] transition-transform duration-300 shadow-sm",
+                        inlineBreakdown ? "translate-x-[17px]" : "translate-x-[1px] opacity-50"
+                      )} />
+                    </div>
+                  </button>
+                  <button 
+                    onClick={handleCopy}
+                    className="p-2 rounded-lg hover:bg-white/5 transition-colors text-white/50 hover:text-white flex items-center gap-2 text-[10px] md:text-xs"
+                  >
+                    {copied ? <Check className="w-3 h-3 md:w-4 md:h-4 text-green-400" /> : <Copy className="w-3 h-3 md:w-4 md:h-4" />}
+                    {copied ? 'Copied' : 'Copy Code'}
+                  </button>
+                </div>
               )}
             </div>
 
             {/* Tab Content */}
-            <div className="flex-1 overflow-auto p-4 md:p-6 font-mono text-xs md:text-sm leading-relaxed">
+            <div className="flex-1 overflow-hidden font-mono text-xs md:text-sm leading-relaxed flex flex-col">
               <AnimatePresence mode="wait">
                 {activeTab === 'code' ? (
                   <motion.div
@@ -149,28 +261,178 @@ const ExperimentDetail = () => {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="relative min-w-max"
+                    className="relative w-full h-full flex flex-col"
                     onMouseLeave={() => setHoveredLine(null)}
                   >
-                    {experiment.code.split('\n').map((line, idx) => {
-                      const lineNum = idx + 1;
-                      const isHighlighted = hoveredLine === lineNum;
-                      return (
-                        <div 
-                          key={idx} 
-                          onMouseEnter={() => setHoveredLine(lineNum)}
-                          className={cn(
-                            "flex gap-4 md:gap-6 px-4 -mx-4 transition-all duration-200 cursor-pointer",
-                            isHighlighted ? "bg-brand-primary/20 scale-[1.01] shadow-[0_0_30px_rgba(99,102,241,0.1)] z-10 rounded-lg" : "opacity-70 hover:opacity-100"
-                          )}
+                    <div className="flex-1 overflow-auto p-4 md:p-6 pb-40 min-w-max">
+                      {experiment.code.split('\n').map((line, idx) => {
+                        const lineNum = idx + 1;
+                        const isHighlighted = hoveredLine === lineNum;
+                        const expl = finalExplanation.find(item => item.line === lineNum);
+
+                        return (
+                          <div 
+                            key={idx} 
+                            onMouseEnter={() => setHoveredLine(lineNum)}
+                            className="relative flex flex-col justify-center"
+                          >
+                            <div className={cn(
+                              "flex gap-4 md:gap-6 px-4 -mx-4 transition-all duration-200 cursor-pointer relative z-10",
+                              isHighlighted ? "bg-brand-primary/30 scale-[1.01] shadow-[0_0_30px_rgba(99,102,241,0.2)] rounded-lg py-1" : "opacity-70 hover:opacity-100"
+                            )}>
+                              <span className="w-6 md:w-8 shrink-0 text-right text-white/40 select-none">{lineNum}</span>
+                              <span className={cn("whitespace-pre", isHighlighted ? "text-white" : "text-indigo-200/80")}>
+                                {line || ' '}
+                              </span>
+                            </div>
+
+                            {/* Floating inline tooltip */}
+                            <AnimatePresence>
+                              {inlineBreakdown && isHighlighted && expl && (
+                                <motion.div 
+                                  initial={{ opacity: 0, y: 5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: 5 }}
+                                  transition={{ duration: 0.15 }}
+                                  className="absolute left-10 md:left-14 top-full mt-1 z-30 pointer-events-none whitespace-normal w-max max-w-[80vw] md:max-w-xl bg-black/95 backdrop-blur-xl border border-brand-primary/50 shadow-[0_10px_40px_rgba(0,0,0,0.8)] rounded-xl p-3"
+                                >
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-[9px] uppercase tracking-widest font-bold text-brand-secondary">{expl.type || 'info'}</span>
+                                  </div>
+                                  <div className="text-xs md:text-sm text-white/95 font-sans leading-relaxed drop-shadow-md">
+                                    {expl.text}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                ) : activeTab === 'practice' ? (
+                  <motion.div
+                    key="practice"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="h-full flex flex-col w-full relative"
+                    onClick={() => hiddenTextareaRef.current?.focus()}
+                  >
+                    <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-white/5 bg-black/20">
+                      <div className="text-white/50 text-xs flex flex-col gap-1">
+                        <span className="text-brand-secondary font-bold uppercase tracking-wider text-[10px]">Interactive Typing Mode</span>
+                        <span>Start typing to match the code below. Red means error, green means correct.</span>
+                      </div>
+                      <div className="flex gap-4 items-center">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSkipComments(!skipComments);
+                            setPracticeCode('');
+                          }}
+                          className="flex items-center gap-2 text-[10px] md:text-xs text-white/50 hover:text-white transition-colors select-none group"
                         >
-                          <span className="w-6 md:w-8 shrink-0 text-right text-white/30 select-none">{lineNum}</span>
-                          <span className={cn("whitespace-pre", isHighlighted ? "text-white" : "text-indigo-200/80")}>
-                            {line || ' '}
+                          <span>Skip Comments</span>
+                          <div className={cn(
+                            "w-8 h-4 rounded-full relative transition-colors duration-300 border border-white/10",
+                            skipComments ? "bg-brand-primary border-brand-primary" : "bg-black/40 group-hover:bg-black/60"
+                          )}>
+                            <div className={cn(
+                              "w-3 h-3 rounded-full bg-white absolute top-[1px] transition-transform duration-300 shadow-sm",
+                              skipComments ? "translate-x-[17px]" : "translate-x-[1px] opacity-50"
+                            )} />
+                          </div>
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPracticeCode('');
+                            hiddenTextareaRef.current?.focus();
+                          }}
+                          className="text-xs px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 transition-colors"
+                        >
+                          Reset
+                        </button>
+                        {practiceCode === targetCode && (
+                          <span className="text-green-400 bg-green-400/10 px-2 py-1 rounded-lg flex items-center gap-1 text-xs font-bold">
+                            <Check className="w-3 h-3" /> Perfect Match!
                           </span>
-                        </div>
-                      );
-                    })}
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-auto p-4 md:p-6 bg-black/40 font-mono text-xs md:text-sm leading-relaxed cursor-text relative">
+                      <textarea
+                        ref={hiddenTextareaRef}
+                        className="absolute w-1 h-1 opacity-0 p-0 m-0 border-0 focus:ring-0 focus:outline-none"
+                        value={practiceCode}
+                        onChange={(e) => setPracticeCode(e.target.value)}
+                        spellCheck={false}
+                        autoCapitalize="off"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        data-gramm="false"
+                      />
+                      
+                      <div className="min-w-max">
+                        {targetCode.split('\n').map((line, lineIndex) => {
+                          const previousLinesLength = targetCode.split('\n').slice(0, lineIndex).join('\n').length;
+                          // +1 for the newline character, except for the first line
+                          const lineStartIdx = previousLinesLength + (lineIndex > 0 ? 1 : 0);
+                          
+                          return (
+                            <div key={lineIndex} className="flex hover:bg-white/5 rounded px-2 -mx-2 transition-colors">
+                              <div className="w-8 md:w-10 shrink-0 text-white/30 text-right pr-3 select-none">
+                                {lineIndex + 1}
+                              </div>
+                              <div className="flex-1 whitespace-pre relative text-white/30">
+                                {line.split('').map((char, charIndex) => {
+                                  const globalIndex = lineStartIdx + charIndex;
+                                  let colorClass = "text-white/30"; // default untyped
+                                  let isErrorSpace = false;
+
+                                  if (globalIndex < practiceCode.length) {
+                                    const isCorrect = practiceCode[globalIndex] === char;
+                                    colorClass = isCorrect ? "text-green-400" : "text-red-400 bg-red-400/20";
+                                    if (!isCorrect && char === ' ') {
+                                      isErrorSpace = true;
+                                    }
+                                  }
+
+                                  const isCursor = globalIndex === practiceCode.length;
+
+                                  return (
+                                    <span 
+                                      key={charIndex} 
+                                      className={cn(
+                                        colorClass, 
+                                        isCursor && "relative after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:w-[2px] after:bg-brand-primary after:animate-pulse",
+                                        isErrorSpace && "inline-block w-[0.5em]" // ensure error spaces are visible
+                                      )}
+                                    >
+                                      {char}
+                                    </span>
+                                  );
+                                })}
+                                {/* Handle cursor at the end of a line (newline pending) */}
+                                {(() => {
+                                  const isNewlineCursor = (lineStartIdx + line.length) === practiceCode.length;
+                                  const isLastLine = lineIndex === targetCode.split('\n').length - 1;
+                                  if (isNewlineCursor && !isLastLine) {
+                                    return <span className="relative after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:w-[2px] after:bg-brand-primary after:animate-pulse ml-[1px] text-white/30">↵</span>;
+                                  }
+                                  if (isNewlineCursor && isLastLine) {
+                                    return <span className="relative after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:w-[2px] after:bg-brand-primary after:animate-pulse ml-[1px]"></span>;
+                                  }
+                                  return null;
+                                })()}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </motion.div>
                 ) : (
                   <motion.div
@@ -178,7 +440,7 @@ const ExperimentDetail = () => {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 1.05 }}
-                    className="h-full flex flex-col items-center justify-center text-center p-12"
+                    className="h-full flex flex-col items-center justify-center text-center p-12 overflow-auto w-full"
                   >
                     {experiment.output.length > 0 ? (
                       <img 
@@ -212,59 +474,7 @@ const ExperimentDetail = () => {
           </div>
         </div>
 
-        {/* Breakdown Card (Order 3 on mobile, Col 1 Row 2 on desktop) */}
-        <div className="glass p-5 md:p-6 rounded-3xl min-h-[150px] md:min-h-[200px] lg:col-span-1 order-3 flex flex-col">
-          <h3 className="text-base md:text-lg font-bold mb-4 md:mb-6 flex items-center gap-2">
-            <Info className="w-4 h-4 md:w-5 md:h-5 text-brand-primary" />
-            Interactive Breakdown
-          </h3>
-          <div className="space-y-3 md:space-y-4 flex-1">
-            <AnimatePresence mode="wait">
-              {hoveredLine ? (
-                finalExplanation.filter(item => item.line === hoveredLine).length > 0 ? (
-                  finalExplanation.filter(item => item.line === hoveredLine).map((item, idx) => (
-                    <motion.div 
-                      key={`expl-${item.line}`}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="p-4 rounded-2xl bg-brand-primary/10 border border-brand-primary/30"
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="text-[10px] uppercase tracking-widest font-bold text-white/30 bg-white/5 px-2 py-1 rounded">Line {item.line}</span>
-                        <span className="text-[10px] uppercase tracking-widest font-bold text-brand-secondary">{item.type || 'info'}</span>
-                      </div>
-                      <p className="text-xs md:text-sm text-white/70 leading-relaxed">{item.text || item}</p>
-                    </motion.div>
-                  ))
-                ) : (
-                  <motion.div
-                    key="no-expl"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="p-4 rounded-2xl bg-white/5 border border-white/10 text-white/40 text-xs md:text-sm text-center italic"
-                  >
-                    No specific explanation for line {hoveredLine}.
-                  </motion.div>
-                )
-              ) : (
-                <motion.div
-                  key="default"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex flex-col items-center justify-center p-6 md:p-8 text-center h-full"
-                >
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/5 flex items-center justify-center mb-3 md:mb-4">
-                    <div className="w-2 h-2 rounded-full bg-brand-primary animate-ping" />
-                  </div>
-                  <p className="text-xs md:text-sm text-white/50">Hover over any line of code to see its detailed explanation here.</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
+
       </div>
 
       {/* Mobile Navigation Arrows (Visible only on small screens) */}
