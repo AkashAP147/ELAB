@@ -9,7 +9,7 @@ const Navbar = () => {
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ type: 'spring', stiffness: 100, damping: 20 }}
-      className="sticky top-0 z-50 w-full glass border-b border-white/10 px-6 py-4"
+      className="sticky top-0 z-50 w-full bg-bg-darker border-b border-white/10 px-6 py-4"
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between relative">
         <Link to="/" className="flex items-center gap-2 group z-10">
