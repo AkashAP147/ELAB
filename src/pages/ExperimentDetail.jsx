@@ -22,6 +22,11 @@ const ExperimentDetail = () => {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Don't switch experiments if typing in the practice editor
+      if (e.target.tagName.toLowerCase() === 'textarea' || e.target.tagName.toLowerCase() === 'input') {
+        return;
+      }
+
       if (e.key === 'ArrowLeft' && prevExperiment) {
         navigate(`/experiment/${prevExperiment.id}`);
       } else if (e.key === 'ArrowRight' && nextExperiment) {
@@ -37,6 +42,7 @@ const ExperimentDetail = () => {
   const [hoveredLine, setHoveredLine] = useState(null);
   const [copied, setCopied] = useState(false);
   const [practiceCode, setPracticeCode] = useState('');
+  const [cursorPos, setCursorPos] = useState(0);
   const [skipComments, setSkipComments] = useState(false);
   const [inlineBreakdown, setInlineBreakdown] = useState(true);
   const hiddenTextareaRef = React.useRef(null);
@@ -317,7 +323,14 @@ const ExperimentDetail = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     className="h-full flex flex-col w-full relative"
-                    onClick={() => hiddenTextareaRef.current?.focus()}
+                    onClick={() => {
+                      if (hiddenTextareaRef.current) {
+                        hiddenTextareaRef.current.focus();
+                        const len = practiceCode.length;
+                        hiddenTextareaRef.current.setSelectionRange(len, len);
+                        setCursorPos(len);
+                      }
+                    }}
                   >
                     <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-white/5 bg-black/20">
                       <div className="text-white/50 text-xs flex flex-col gap-1">
@@ -367,7 +380,26 @@ const ExperimentDetail = () => {
                         ref={hiddenTextareaRef}
                         className="absolute w-1 h-1 opacity-0 p-0 m-0 border-0 focus:ring-0 focus:outline-none"
                         value={practiceCode}
-                        onChange={(e) => setPracticeCode(e.target.value)}
+                        onChange={(e) => {
+                          setPracticeCode(e.target.value);
+                          setCursorPos(e.target.selectionStart);
+                        }}
+                        onSelect={(e) => setCursorPos(e.target.selectionStart)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Tab') {
+                            e.preventDefault();
+                            const { selectionStart, selectionEnd } = e.target;
+                            const newCode = practiceCode.substring(0, selectionStart) + '    ' + practiceCode.substring(selectionEnd);
+                            setPracticeCode(newCode);
+                            const newPos = selectionStart + 4;
+                            setTimeout(() => {
+                              if (hiddenTextareaRef.current) {
+                                hiddenTextareaRef.current.selectionStart = hiddenTextareaRef.current.selectionEnd = newPos;
+                                setCursorPos(newPos);
+                              }
+                            }, 0);
+                          }
+                        }}
                         spellCheck={false}
                         autoCapitalize="off"
                         autoComplete="off"
@@ -400,15 +432,34 @@ const ExperimentDetail = () => {
                                     }
                                   }
 
-                                  const isCursor = globalIndex === practiceCode.length;
+                                  const isCursor = globalIndex === cursorPos;
 
                                   return (
                                     <span 
                                       key={charIndex} 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (hiddenTextareaRef.current) {
+                                          let currentCode = practiceCode;
+                                          if (globalIndex > practiceCode.length) {
+                                            currentCode = practiceCode + targetCode.substring(practiceCode.length, globalIndex);
+                                            setPracticeCode(currentCode);
+                                          }
+                                          
+                                          setTimeout(() => {
+                                            if (hiddenTextareaRef.current) {
+                                              hiddenTextareaRef.current.focus();
+                                              hiddenTextareaRef.current.setSelectionRange(globalIndex, globalIndex);
+                                              setCursorPos(globalIndex);
+                                            }
+                                          }, 0);
+                                        }
+                                      }}
                                       className={cn(
                                         colorClass, 
                                         isCursor && "relative after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:w-[2px] after:bg-brand-primary after:animate-pulse",
-                                        isErrorSpace && "inline-block w-[0.5em]" // ensure error spaces are visible
+                                        isErrorSpace && "inline-block w-[0.5em]", // ensure error spaces are visible
+                                        "cursor-text"
                                       )}
                                     >
                                       {char}
@@ -417,10 +468,21 @@ const ExperimentDetail = () => {
                                 })}
                                 {/* Handle cursor at the end of a line (newline pending) */}
                                 {(() => {
-                                  const isNewlineCursor = (lineStartIdx + line.length) === practiceCode.length;
+                                  const isNewlineCursor = (lineStartIdx + line.length) === cursorPos;
                                   const isLastLine = lineIndex === targetCode.split('\n').length - 1;
                                   if (isNewlineCursor && !isLastLine) {
-                                    return <span className="relative after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:w-[2px] after:bg-brand-primary after:animate-pulse ml-[1px] text-white/30">↵</span>;
+                                    return <span 
+                                      className="relative after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:w-[2px] after:bg-brand-primary after:animate-pulse ml-[1px] text-white/30 cursor-text"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (hiddenTextareaRef.current) {
+                                          const pos = lineStartIdx + line.length;
+                                          hiddenTextareaRef.current.focus();
+                                          hiddenTextareaRef.current.setSelectionRange(pos, pos);
+                                          setCursorPos(pos);
+                                        }
+                                      }}
+                                    >↵</span>;
                                   }
                                   if (isNewlineCursor && isLastLine) {
                                     return <span className="relative after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:w-[2px] after:bg-brand-primary after:animate-pulse ml-[1px]"></span>;
