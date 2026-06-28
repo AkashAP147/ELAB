@@ -38,7 +38,11 @@ const ExperimentDetail = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [prevExperiment, nextExperiment, navigate]);
 
-  const [activeTab, setActiveTab] = useState('code');
+  const [activeTab, setActiveTab] = useState(experiment?.lab === 'DEVOP' ? 'pdf' : 'code');
+
+  useEffect(() => {
+    setActiveTab(experiment?.lab === 'DEVOP' ? 'pdf' : 'code');
+  }, [experiment?.id, experiment?.lab]);
   const [hoveredLine, setHoveredLine] = useState(null);
   const [copied, setCopied] = useState(false);
   const [practiceCode, setPracticeCode] = useState('');
@@ -224,7 +228,7 @@ const ExperimentDetail = () => {
             {/* Tabs Header */}
             <div className="flex flex-wrap items-center justify-between gap-4 px-4 md:px-6 py-3 md:py-4 border-b border-white/5 bg-white/5">
               <div className="flex gap-2 md:gap-4">
-                {['code', 'practice', 'output'].map((tab) => (
+                {(experiment.lab === 'DEVOP' ? ['pdf'] : ['code', 'practice', 'output']).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -268,7 +272,21 @@ const ExperimentDetail = () => {
             {/* Tab Content */}
             <div className="flex-1 overflow-hidden font-mono text-xs md:text-sm leading-relaxed flex flex-col">
               <AnimatePresence mode="wait">
-                {activeTab === 'code' ? (
+                {activeTab === 'pdf' ? (
+                  <motion.div
+                    key="pdf"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="relative w-full h-full flex flex-col bg-white"
+                  >
+                    <iframe 
+                      src={experiment.downloadLink} 
+                      className="w-full h-full border-none"
+                      title={experiment.title}
+                    />
+                  </motion.div>
+                ) : activeTab === 'code' ? (
                   <motion.div
                     key="code"
                     initial={{ opacity: 0, y: 10 }}
