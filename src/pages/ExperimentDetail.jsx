@@ -212,7 +212,7 @@ const ExperimentDetail = () => {
                 className="inline-flex items-center gap-2 px-4 py-2 bg-brand-primary/20 hover:bg-brand-primary/40 text-brand-secondary border border-brand-primary/30 rounded-xl transition-all text-xs md:text-sm font-medium"
               >
                 <Download className="w-4 h-4" />
-                Download Dataset
+                {experiment.lab === 'DEVOP' ? 'Download PDF' : 'Download Dataset'}
               </a>
             </div>
           )}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Brain, Code, Cpu, Database } from 'lucide-react';
+import { ArrowRight, Brain, Code, Cpu, Database, Server } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { experiments } from '../data/experiments';
 
@@ -28,6 +28,12 @@ const labDefs = [
     description: 'Deep learning, neural networks, and computer vision.',
     icon: Cpu,
     color: 'from-purple-500 to-pink-600',
+  },
+  {
+    title: 'DEVOP',
+    description: 'Development and Operations methodologies, CI/CD, and deployment strategies.',
+    icon: Server,
+    color: 'from-teal-400 to-cyan-600',
   }
 ];
 

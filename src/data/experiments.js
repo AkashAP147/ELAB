@@ -500,5 +500,113 @@ if __name__ == '__main__':
     explanation: [],
     output: [],
     textOutput: ''
+  },
+  {
+    id: 'devop-01',
+    number: '01',
+    title: "Experiment 1",
+    description: "Download the PDF to view the experiment details.",
+    lab: 'DEVOP',
+    code: `// Please download the PDF file to view this experiment.`,
+    downloadLink: '/devop/EXP 1.pdf',
+    explanation: [],
+    output: [],
+    textOutput: ''
+  },
+  {
+    id: 'devop-02',
+    number: '02',
+    title: "Experiment 2",
+    description: "Download the PDF to view the experiment details.",
+    lab: 'DEVOP',
+    code: `// Please download the PDF file to view this experiment.`,
+    downloadLink: '/devop/EXP 2.pdf',
+    explanation: [],
+    output: [],
+    textOutput: ''
+  },
+  {
+    id: 'devop-03',
+    number: '03',
+    title: "Experiment 3",
+    description: "Download the PDF to view the experiment details.",
+    lab: 'DEVOP',
+    code: `// Please download the PDF file to view this experiment.`,
+    downloadLink: '/devop/EXP 3.pdf',
+    explanation: [],
+    output: [],
+    textOutput: ''
+  },
+  {
+    id: 'devop-04',
+    number: '04',
+    title: "Experiment 4",
+    description: "Download the PDF to view the experiment details.",
+    lab: 'DEVOP',
+    code: `// Please download the PDF file to view this experiment.`,
+    downloadLink: '/devop/EXP 4.pdf',
+    explanation: [],
+    output: [],
+    textOutput: ''
+  },
+  {
+    id: 'devop-05',
+    number: '05',
+    title: "Experiment 5",
+    description: "Download the PDF to view the experiment details.",
+    lab: 'DEVOP',
+    code: `// Please download the PDF file to view this experiment.`,
+    downloadLink: '/devop/EXP 5.pdf',
+    explanation: [],
+    output: [],
+    textOutput: ''
+  },
+  {
+    id: 'devop-06',
+    number: '06',
+    title: "Experiment 6",
+    description: "Download the PDF to view the experiment details.",
+    lab: 'DEVOP',
+    code: `// Please download the PDF file to view this experiment.`,
+    downloadLink: '/devop/EXP 6.pdf',
+    explanation: [],
+    output: [],
+    textOutput: ''
+  },
+  {
+    id: 'devop-07',
+    number: '07',
+    title: "Experiment 7",
+    description: "Download the PDF to view the experiment details.",
+    lab: 'DEVOP',
+    code: `// Please download the PDF file to view this experiment.`,
+    downloadLink: '/devop/EXP 7.pdf',
+    explanation: [],
+    output: [],
+    textOutput: ''
+  },
+  {
+    id: 'devop-08',
+    number: '08',
+    title: "Experiment 8",
+    description: "Download the PDF to view the experiment details.",
+    lab: 'DEVOP',
+    code: `// Please download the PDF file to view this experiment.`,
+    downloadLink: '/devop/EXP 8.pdf',
+    explanation: [],
+    output: [],
+    textOutput: ''
+  },
+  {
+    id: 'devop-09',
+    number: '09',
+    title: "Lab Manual",
+    description: "Download the Lab Manual PDF.",
+    lab: 'DEVOP',
+    code: `// Please download the PDF file to view the lab manual.`,
+    downloadLink: '/devop/Lab manual (1).pdf',
+    explanation: [],
+    output: [],
+    textOutput: ''
   }
 ];
