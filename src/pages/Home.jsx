@@ -1,48 +1,41 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Brain, Code, Cpu, Database, Server } from 'lucide-react';
+import { ArrowRight, Brain, Code, Cpu, Database, Server, FlaskConical, Beaker, Atom, GraduationCap, Layers, Boxes, FileCode, BookOpen, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { experiments } from '../data/experiments';
+import { subscribeLabs, subscribeExperiments } from '../data/firebaseService';
 
-const labDefs = [
-  {
-    title: 'Machine Learning',
-    description: 'Explore regression, classification, and clustering algorithms.',
-    icon: Brain,
-    color: 'from-blue-500 to-indigo-600',
-  },
-  {
-    title: 'Python Programming',
-    description: 'Master core concepts and advanced data structures.',
-    icon: Code,
-    color: 'from-yellow-400 to-orange-500',
-  },
-  {
-    title: 'Data Science',
-    description: 'Techniques for data visualization and statistical analysis.',
-    icon: Database,
-    color: 'from-green-400 to-emerald-600',
-  },
-  {
-    title: 'Artificial Intelligence',
-    description: 'Deep learning, neural networks, and computer vision.',
-    icon: Cpu,
-    color: 'from-purple-500 to-pink-600',
-  },
-  {
-    title: 'DEVOP',
-    description: 'Development and Operations methodologies, CI/CD, and deployment strategies.',
-    icon: Server,
-    color: 'from-teal-400 to-cyan-600',
-  }
-];
-
-const labs = labDefs.map(lab => ({
-  ...lab,
-  count: experiments.filter(e => e.lab === lab.title).length
-}));
+// Icon map matching what's used in Admin panel
+const ICON_MAP = {
+  Brain, Code, Database, Cpu, Server, FlaskConical, Beaker, Atom, GraduationCap, Layers, Boxes, FileCode, BookOpen,
+};
 
 const Home = () => {
+  const [labs, setLabs] = useState([]);
+  const [labCounts, setLabCounts] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  // Subscribe to labs in realtime
+  useEffect(() => {
+    const unsub = subscribeLabs((labsData) => {
+      setLabs(labsData);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  // Subscribe to experiment counts for each lab
+  useEffect(() => {
+    if (labs.length === 0) return;
+    
+    const unsubs = labs.map((lab) =>
+      subscribeExperiments(lab.id, (exps) => {
+        setLabCounts((prev) => ({ ...prev, [lab.id]: exps.length }));
+      })
+    );
+
+    return () => unsubs.forEach((u) => u());
+  }, [labs]);
+
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20">
       <div className="text-center mb-16 md:mb-24">
@@ -73,36 +66,76 @@ const Home = () => {
         </motion.div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {labs.map((lab, index) => (
-          <Link
-            key={lab.title}
-            to={`/experiments/${lab.title.toLowerCase().replace(/\s+/g, '-')}`}
-            className="block h-full"
+      {/* Loading State */}
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-brand-primary" />
+          <p className="text-white/40 text-sm">Loading labs...</p>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && labs.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass rounded-3xl p-12 text-center max-w-lg mx-auto"
+        >
+          <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-6">
+            <FlaskConical className="w-10 h-10 text-white/20" />
+          </div>
+          <h3 className="text-xl font-bold mb-2">No Labs Yet</h3>
+          <p className="text-white/40 text-sm mb-6">
+            Head over to the Admin Dashboard to add your first lab section.
+          </p>
+          <Link 
+            to="/admin" 
+            className="inline-flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/80 text-white px-6 py-3 rounded-xl text-sm font-medium transition-all"
           >
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 * index }}
-              whileHover={{ y: -10 }}
-              className="glass p-8 rounded-3xl relative overflow-hidden group cursor-pointer h-full"
-            >
-            <div className={`absolute top-0 left-0 w-2 h-full bg-gradient-to-b ${lab.color}`} />
-            <div className="mb-6 p-4 w-fit rounded-2xl bg-white/5 group-hover:bg-white/10 transition-colors">
-              <lab.icon className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-2xl font-bold mb-3">{lab.title}</h3>
-            <p className="text-white/40 mb-6 line-clamp-2">{lab.description}</p>
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-white/60">{lab.count} Experiments</span>
-              <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <ArrowRight className="w-4 h-4" />
-              </div>
-            </div>
-          </motion.div>
-        </Link>
-        ))}
-      </div>
+            Go to Admin <ArrowRight className="w-4 h-4" />
+          </Link>
+        </motion.div>
+      )}
+
+      {/* Lab Cards */}
+      {!loading && labs.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {labs.map((lab, index) => {
+            const IconComp = ICON_MAP[lab.icon] || Brain;
+            const count = labCounts[lab.id] || 0;
+
+            return (
+              <Link
+                key={lab.id}
+                to={`/experiments/${lab.id}`}
+                className="block h-full"
+              >
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 * index }}
+                  whileHover={{ y: -10 }}
+                  className="glass p-8 rounded-3xl relative overflow-hidden group cursor-pointer h-full"
+                >
+                <div className={`absolute top-0 left-0 w-2 h-full bg-gradient-to-b ${lab.color}`} />
+                <div className="mb-6 p-4 w-fit rounded-2xl bg-white/5 group-hover:bg-white/10 transition-colors">
+                  <IconComp className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold mb-1">{lab.name}</h3>
+                <span className="text-xs font-mono text-brand-secondary/70 mb-3 block">{lab.code}</span>
+                <p className="text-white/40 mb-6 line-clamp-2">{lab.description}</p>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-white/60">{count} Programs</span>
+                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </motion.div>
+            </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

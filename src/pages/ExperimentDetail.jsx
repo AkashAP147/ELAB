@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Info, Play, Copy, Check, Download } from 'lucide-react';
-import { experiments } from '../data/experiments';
+import { ChevronLeft, ChevronRight, Info, Play, Copy, Check, Download, Loader2 } from 'lucide-react';
+import { getExperiment, getExperimentsByLab } from '../data/firebaseService';
+import { ref, get } from 'firebase/database';
+import { database } from '../firebase';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -11,38 +13,15 @@ const cn = (...inputs) => {
 }
 
 const ExperimentDetail = () => {
-  const { id } = useParams();
-  
-  const currentIndex = experiments.findIndex(e => e.id === id);
-  const experiment = experiments[currentIndex];
-  const prevExperiment = currentIndex > 0 ? experiments[currentIndex - 1] : null;
-  const nextExperiment = currentIndex < experiments.length - 1 ? experiments[currentIndex + 1] : null;
-
+  const { labId, expId } = useParams();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Don't switch experiments if typing in the practice editor
-      if (e.target.tagName.toLowerCase() === 'textarea' || e.target.tagName.toLowerCase() === 'input') {
-        return;
-      }
+  const [experiment, setExperiment] = useState(null);
+  const [allExperiments, setAllExperiments] = useState([]);
+  const [labInfo, setLabInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-      if (e.key === 'ArrowLeft' && prevExperiment) {
-        navigate(`/experiment/${prevExperiment.id}`);
-      } else if (e.key === 'ArrowRight' && nextExperiment) {
-        navigate(`/experiment/${nextExperiment.id}`);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [prevExperiment, nextExperiment, navigate]);
-
-  const [activeTab, setActiveTab] = useState(experiment?.lab === 'DEVOP' ? 'pdf' : 'code');
-
-  useEffect(() => {
-    setActiveTab(experiment?.lab === 'DEVOP' ? 'pdf' : 'code');
-  }, [experiment?.id, experiment?.lab]);
+  const [activeTab, setActiveTab] = useState('code');
   const [hoveredLine, setHoveredLine] = useState(null);
   const [copied, setCopied] = useState(false);
   const [practiceCode, setPracticeCode] = useState('');
@@ -52,6 +31,62 @@ const ExperimentDetail = () => {
   const hiddenTextareaRef = React.useRef(null);
   const cursorRef = React.useRef(null);
 
+  // Fetch data
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Fetch experiment
+        const expRef = ref(database, `experiments/${labId}/${expId}`);
+        const expSnapshot = await get(expRef);
+        if (expSnapshot.exists()) {
+          const expData = { id: expId, labId, ...expSnapshot.val() };
+          setExperiment(expData);
+
+          // Check if it's a PDF-type lab (has downloadLink and no real code)
+          const isPdfLab = expData.downloadLink && (!expData.code || expData.code.includes('Please download'));
+          setActiveTab(isPdfLab ? 'pdf' : 'code');
+        }
+
+        // Fetch lab info
+        const labRef = ref(database, `labs/${labId}`);
+        const labSnapshot = await get(labRef);
+        if (labSnapshot.exists()) {
+          setLabInfo({ id: labId, ...labSnapshot.val() });
+        }
+
+        // Fetch all experiments for navigation
+        const exps = await getExperimentsByLab(labId);
+        setAllExperiments(exps);
+      } catch (err) {
+        console.error('Error fetching experiment:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [labId, expId]);
+
+  // Navigation
+  const currentIndex = allExperiments.findIndex(e => e.id === expId);
+  const prevExperiment = currentIndex > 0 ? allExperiments[currentIndex - 1] : null;
+  const nextExperiment = currentIndex < allExperiments.length - 1 ? allExperiments[currentIndex + 1] : null;
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target.tagName.toLowerCase() === 'textarea' || e.target.tagName.toLowerCase() === 'input') return;
+      if (e.key === 'ArrowLeft' && prevExperiment) {
+        navigate(`/experiment/${labId}/${prevExperiment.id}`);
+      } else if (e.key === 'ArrowRight' && nextExperiment) {
+        navigate(`/experiment/${labId}/${nextExperiment.id}`);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [prevExperiment, nextExperiment, navigate, labId]);
+
+  // Scroll cursor into view
   useEffect(() => {
     if (cursorRef.current && activeTab === 'practice') {
       cursorRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -59,12 +94,13 @@ const ExperimentDetail = () => {
   }, [cursorPos, activeTab]);
 
   const targetCode = React.useMemo(() => {
+    if (!experiment?.code) return '';
     if (!skipComments) return experiment.code;
     return experiment.code
       .split('\n')
       .filter(line => !line.trim().startsWith('#'))
       .join('\n');
-  }, [experiment.code, skipComments]);
+  }, [experiment?.code, skipComments]);
 
   const autoGenerateExplanation = (code) => {
     const lines = code.split('\n');
@@ -173,29 +209,42 @@ const ExperimentDetail = () => {
     return autoExpl;
   };
 
-  const generatedExplanation = autoGenerateExplanation(experiment.code);
-  const finalExplanation = generatedExplanation.map(gen => {
-    const customExpl = experiment.explanation?.find(e => e.line === gen.line);
-    return customExpl ? customExpl : gen;
-  });
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-primary" />
+        <p className="text-white/40 text-sm">Loading experiment...</p>
+      </div>
+    );
+  }
 
   if (!experiment) return <div className="text-white p-20 text-center">Experiment not found</div>;
 
+  const generatedExplanation = autoGenerateExplanation(experiment.code || '');
+  const expExplanation = experiment.explanation || [];
+  const finalExplanation = generatedExplanation.map(gen => {
+    const customExpl = expExplanation.find(e => e.line === gen.line);
+    return customExpl ? customExpl : gen;
+  });
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(experiment.code);
+    navigator.clipboard.writeText(experiment.code || '');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const isPdfLab = experiment.downloadLink && (!experiment.code || experiment.code.includes('Please download'));
+  const tabs = isPdfLab ? ['pdf'] : ['code', 'practice', 'output'];
+
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-12">
-      <Link to="/" className="inline-flex items-center gap-2 text-white/50 hover:text-white transition-colors mb-6 md:mb-8 group text-sm md:text-base">
+      <Link to={`/experiments/${labId}`} className="inline-flex items-center gap-2 text-white/50 hover:text-white transition-colors mb-6 md:mb-8 group text-sm md:text-base">
         <ChevronLeft className="w-4 h-4 md:w-5 md:h-5 group-hover:-translate-x-1 transition-transform" />
-        Back to Labs
+        Back to {labInfo?.name || 'Labs'}
       </Link>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-start">
-        {/* Info Card (Order 1 on mobile, Col 1 Row 1 on desktop) */}
+        {/* Info Card */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -216,19 +265,19 @@ const ExperimentDetail = () => {
                 className="inline-flex items-center gap-2 px-4 py-2 bg-brand-primary/20 hover:bg-brand-primary/40 text-brand-secondary border border-brand-primary/30 rounded-xl transition-all text-xs md:text-sm font-medium"
               >
                 <Download className="w-4 h-4" />
-                {experiment.lab === 'DEVOP' ? 'Download PDF' : 'Download Dataset'}
+                {isPdfLab ? 'Download PDF' : 'Download Dataset'}
               </a>
             </div>
           )}
         </motion.div>
 
-        {/* Right Column: Code & Viewers (Order 2 on mobile, Col 2-3 Row 1-2 on desktop) */}
+        {/* Right Column: Code & Viewers */}
         <div className="lg:col-span-2 lg:row-span-2 order-2 space-y-6">
           <div className="glass rounded-3xl overflow-hidden flex flex-col h-[500px] lg:h-[700px]">
             {/* Tabs Header */}
             <div className="flex flex-wrap items-center justify-between gap-4 px-4 md:px-6 py-3 md:py-4 border-b border-white/5 bg-white/5">
               <div className="flex gap-2 md:gap-4">
-                {(experiment.lab === 'DEVOP' ? ['pdf'] : ['code', 'practice', 'output']).map((tab) => (
+                {tabs.map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -297,7 +346,7 @@ const ExperimentDetail = () => {
                   >
                     <div className="flex-1 overflow-auto p-4 md:p-6 pb-40">
                       <div className="min-w-max">
-                        {experiment.code.split('\n').map((line, idx) => {
+                        {(experiment.code || '').split('\n').map((line, idx) => {
                         const lineNum = idx + 1;
                         const isHighlighted = hoveredLine === lineNum;
                         const expl = finalExplanation.find(item => item.line === lineNum);
@@ -437,7 +486,6 @@ const ExperimentDetail = () => {
                       <div className="min-w-max">
                         {targetCode.split('\n').map((line, lineIndex) => {
                           const previousLinesLength = targetCode.split('\n').slice(0, lineIndex).join('\n').length;
-                          // +1 for the newline character, except for the first line
                           const lineStartIdx = previousLinesLength + (lineIndex > 0 ? 1 : 0);
                           
                           return (
@@ -448,7 +496,7 @@ const ExperimentDetail = () => {
                               <div className="flex-1 whitespace-pre relative text-white/30">
                                 {line.split('').map((char, charIndex) => {
                                   const globalIndex = lineStartIdx + charIndex;
-                                  let colorClass = "text-white/30"; // default untyped
+                                  let colorClass = "text-white/30";
                                   let isErrorSpace = false;
 
                                   if (globalIndex < practiceCode.length) {
@@ -486,7 +534,7 @@ const ExperimentDetail = () => {
                                       className={cn(
                                         colorClass, 
                                         isCursor && "relative after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:w-[2px] after:bg-brand-primary after:animate-pulse scroll-mb-32",
-                                        isErrorSpace && "inline-block w-[0.5em]", // ensure error spaces are visible
+                                        isErrorSpace && "inline-block w-[0.5em]",
                                         "cursor-text"
                                       )}
                                     >
@@ -494,7 +542,7 @@ const ExperimentDetail = () => {
                                     </span>
                                   );
                                 })}
-                                {/* Handle cursor at the end of a line (newline pending) */}
+                                {/* Handle cursor at the end of a line */}
                                 {(() => {
                                   const isNewlineCursor = (lineStartIdx + line.length) === cursorPos;
                                   const isLastLine = lineIndex === targetCode.split('\n').length - 1;
@@ -533,7 +581,7 @@ const ExperimentDetail = () => {
                     exit={{ opacity: 0, scale: 1.05 }}
                     className="h-full flex flex-col items-center justify-center text-center p-12 overflow-auto w-full"
                   >
-                    {experiment.output.length > 0 ? (
+                    {experiment.output && experiment.output.length > 0 ? (
                       <img 
                         src={experiment.output[0]} 
                         alt="Experiment Result" 
@@ -568,11 +616,11 @@ const ExperimentDetail = () => {
 
       </div>
 
-      {/* Mobile Navigation Arrows (Visible only on small screens) */}
+      {/* Mobile Navigation Arrows */}
       <div className="mt-12 pt-8 border-t border-white/10 flex md:hidden items-center justify-between gap-4">
         {prevExperiment ? (
           <Link 
-            to={`/experiment/${prevExperiment.id}`}
+            to={`/experiment/${labId}/${prevExperiment.id}`}
             className="flex-1 flex flex-col items-start gap-1 px-4 py-3 rounded-2xl glass hover:bg-white/10 transition-colors"
           >
             <div className="text-[10px] text-white/50 uppercase tracking-wider font-bold">Previous</div>
@@ -582,7 +630,7 @@ const ExperimentDetail = () => {
 
         {nextExperiment ? (
           <Link 
-            to={`/experiment/${nextExperiment.id}`}
+            to={`/experiment/${labId}/${nextExperiment.id}`}
             className="flex-1 flex flex-col items-end gap-1 px-4 py-3 rounded-2xl glass hover:bg-white/10 transition-colors text-right"
           >
             <div className="text-[10px] text-white/50 uppercase tracking-wider font-bold">Next</div>
@@ -594,7 +642,7 @@ const ExperimentDetail = () => {
       {/* Fixed Side Navigation Arrows (Desktop only) */}
       {prevExperiment && (
         <Link 
-          to={`/experiment/${prevExperiment.id}`}
+          to={`/experiment/${labId}/${prevExperiment.id}`}
           title={`Previous: ${prevExperiment.title}`}
           className="hidden md:flex fixed left-4 lg:left-8 top-1/2 -translate-y-1/2 z-40 p-3 lg:p-4 rounded-full glass hover:bg-white/10 transition-all group shadow-xl shadow-black/20 hover:scale-110"
         >
@@ -604,7 +652,7 @@ const ExperimentDetail = () => {
 
       {nextExperiment && (
         <Link 
-          to={`/experiment/${nextExperiment.id}`}
+          to={`/experiment/${labId}/${nextExperiment.id}`}
           title={`Next: ${nextExperiment.title}`}
           className="hidden md:flex fixed right-4 lg:right-8 top-1/2 -translate-y-1/2 z-40 p-3 lg:p-4 rounded-full glass hover:bg-white/10 transition-all group shadow-xl shadow-black/20 hover:scale-110"
         >

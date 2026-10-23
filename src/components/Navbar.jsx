@@ -35,7 +35,6 @@ const Navbar = () => {
 
         <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-8 text-sm font-medium text-white/60">
           <Link to="/" className="hover:text-white transition-colors px-2 py-1">Labs</Link>
-          <Link to="/experiments/machine-learning" className="hover:text-white transition-colors px-2 py-1">Experiments</Link>
           <a href="https://github.com" target="_blank" rel="noreferrer" className="hover:text-white transition-colors px-2 py-1">Documentation</a>
         </div>
 
