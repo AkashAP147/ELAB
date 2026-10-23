@@ -388,7 +388,7 @@ const ExperimentModal = ({ experiment, labId, onClose, onSave }) => {
 
 // ─── Password Gate ──────────────────────────────────────────────
 
-const ADMIN_PASSCODE = '96500';
+const ADMIN_PASSCODE = import.meta.env.VITE_ADMIN_PASSCODE || '96500';
 
 const PasswordGate = ({ onUnlock }) => {
   const [passcode, setPasscode] = useState('');
